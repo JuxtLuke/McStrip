@@ -138,15 +138,15 @@
             <div class="grid">
                 <div class="card">
                     <div><h3>McErotik Burger</h3><p>Extra saftig mit Spezialsoße.</p></div>
-                    <div><div class="price">15 $</div><button onclick="addToCart('McErotik Burger', 15)">In den Warenkorb</button></div>
+                    <div><div class="price">15 Dias</div><button onclick="addToCart('McErotik Burger', 15)">In den Warenkorb</button></div>
                 </div>
                 <div class="card">
                     <div><h3>VIP Menü</h3><p>Burger, Pommes, VIP-Getränk & Dance-Gutschein.</p></div>
-                    <div><div class="price">50 $</div><button onclick="addToCart('VIP Menü', 50)">In den Warenkorb</button></div>
+                    <div><div class="price">50 Dias</div><button onclick="addToCart('VIP Menü', 50)">In den Warenkorb</button></div>
                 </div>
                 <div class="card">
                     <div><h3>Hot Fries</h3><p>Scharfe Fritten für heiße Nächte.</p></div>
-                    <div><div class="price">8 $</div><button onclick="addToCart('Hot Fries', 8)">In den Warenkorb</button></div>
+                    <div><div class="price">8 Dias</div><button onclick="addToCart('Hot Fries', 8)">In den Warenkorb</button></div>
                 </div>
             </div>
 
@@ -154,15 +154,15 @@
             <div class="grid">
                 <div class="card">
                     <div><h3>Private Lapdance</h3><p>10 Minuten Exklusivtanz in der VIP-Lounge.</p></div>
-                    <div><div class="price">100 $</div><button onclick="addToCart('Private Lapdance', 100)">In den Warenkorb</button></div>
+                    <div><div class="price">100 Dias</div><button onclick="addToCart('Private Lapdance', 100)">In den Warenkorb</button></div>
                 </div>
                 <div class="card">
                     <div><h3>Table Dance (30 Min)</h3><p>Tänzer/in direkt an deinem Tisch im Club.</p></div>
-                    <div><div class="price">250 $</div><button onclick="addToCart('Table Dance (30 Min)', 250)">In den Warenkorb</button></div>
+                    <div><div class="price">250 Dias</div><button onclick="addToCart('Table Dance (30 Min)', 250)">In den Warenkorb</button></div>
                 </div>
                 <div class="card">
                     <div><h3>Hausbesuch (Delivery Dance)</h3><p>Tänzer/in kommt zu deinen Minecraft-Koordinaten.</p></div>
-                    <div><div class="price">500 $</div><button onclick="addToCart('Hausbesuch Service', 500)">In den Warenkorb</button></div>
+                    <div><div class="price">500 Dias</div><button onclick="addToCart('Hausbesuch Service', 500)">In den Warenkorb</button></div>
                 </div>
             </div>
 
@@ -170,7 +170,7 @@
             <div class="cart-box">
                 <h2>🛒 Dein Warenkorb</h2>
                 <div id="cart-items" style="margin: 15px 0;">Keine Artikel im Warenkorb.</div>
-                <p><strong>Gesamt: <span id="cart-total">0</span> $</strong></p>
+                <p><strong>Gesamt: <span id="cart-total">0</span> Dias</strong></p>
 
                 <div class="checkout-form">
                     <label>Art der Lieferung:</label>
@@ -211,7 +211,7 @@
     </div>
 
     <script>
-        // Deine Firebase-Zugangsdaten sind hier eingebaut:
+        // Deine Firebase-Zugangsdaten:
         const firebaseConfig = {
             apiKey: "AIzaSyBXd4QWbxZUcqcqBCpVNhZM1v7NZR_OC1A",
             authDomain: "mcstrip.firebaseapp.com",
@@ -278,7 +278,7 @@
             let total = 0;
             cart.forEach((c) => {
                 total += c.price;
-                list.innerHTML += `<div class="cart-item"><span>${c.item}</span> <span>${c.price} $</span></div>`;
+                list.innerHTML += `<div class="cart-item"><span>${c.item}</span> <span>${c.price} Dias</span></div>`;
             });
             totalEl.innerText = total;
         }
@@ -342,7 +342,7 @@
                             <td>${o.type}</td>
                             <td>${o.coords}</td>
                             <td>${o.items}</td>
-                            <td>${o.total} $</td>
+                            <td>${o.total} Dias</td>
                             <td><button class="status-btn" onclick="completeOrder('${key}')">Erledigt</button></td>
                         </tr>
                     `;
