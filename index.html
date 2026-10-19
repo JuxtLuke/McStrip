@@ -348,12 +348,12 @@
         function switchView(view) {
             if(view === 'admin') {
                 let pass = prompt("Admin-Passwort eingeben:");
-                if(pass !== "admin123") {
+                if(pass !== "67admin67") { // Neue Passwortabfrage
                     alert("Falsches Passwort!");
                     return;
                 }
                 listenForOrders();
-                listenForUsers(); // Lädt zusätzlich die Spielerdatenbank für Admins
+                listenForUsers();
             }
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.getElementById(view + '-view').classList.add('active');
@@ -428,7 +428,6 @@
             });
         }
 
-        // Eigene Bestell-Historie laden
         function loadUserHistory() {
             if(!currentUser) return;
             database.ref('orders').on('value', (snapshot) => {
@@ -459,7 +458,6 @@
             });
         }
 
-        // Live-Bestellungen für Admin laden
         function listenForOrders() {
             database.ref('orders').on('value', (snapshot) => {
                 let tbody = document.getElementById('admin-orders-list');
@@ -487,7 +485,6 @@
             });
         }
 
-        // Benutzerliste für Admin laden
         function listenForUsers() {
             database.ref('users').on('value', (snapshot) => {
                 let tbody = document.getElementById('admin-users-list');
@@ -515,7 +512,6 @@
             });
         }
 
-        // Admin-Funktion: Passwort eines Spielers ändern
         function resetUserPassword(username) {
             let newPass = prompt(`Neues Passwort für ${username} eingeben:`);
             if(newPass && newPass.trim() !== "") {
@@ -525,7 +521,6 @@
             }
         }
 
-        // Admin-Funktion: Account löschen
         function deleteUserAccount(username) {
             if(confirm(`Möchtest du den Account von ${username} wirklich löschen?`)) {
                 database.ref('users/' + username).remove().then(() => {
