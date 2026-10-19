@@ -6,7 +6,7 @@
     <title>McStrip - Fast Food & High Entertainment</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
     
-    <!-- Firebase SDKs für Live-Datenbank -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -51,7 +51,8 @@
 
         /* User Bar */
         .user-bar { background: #222; padding: 10px 30px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; border-bottom: 1px solid #333; }
-        .user-bar button { background: none; border: none; color: var(--yellow); cursor: pointer; text-decoration: underline; font-weight: 600; }
+        .auth-btns button { background: var(--yellow); color: black; border: none; padding: 5px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 5px; }
+        .logout-btn { background: var(--red) !important; color: white !important; }
 
         /* Container & Views */
         .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
@@ -87,8 +88,8 @@
         }
         .card button:hover { background: #e0ac24; }
 
-        /* Warenkorb */
-        .cart-box { 
+        /* Warenkorb & Historie */
+        .cart-box, .history-box { 
             background: var(--card-bg); 
             padding: 20px; 
             border-radius: 12px; 
@@ -107,8 +108,8 @@
             outline: none;
         }
 
-        /* Admin Table */
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: var(--card-bg); border-radius: 8px; overflow: hidden; }
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: var(--card-bg); border-radius: 8px; overflow: hidden; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; font-size: 14px; }
         th { background: var(--red); color: white; }
         .status-btn { background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
@@ -127,7 +128,10 @@
 
     <div class="user-bar">
         <span id="user-display">Nicht eingeloggt</span>
-        <button onclick="loginUser()">Spieler Login</button>
+        <div class="auth-btns" id="auth-buttons">
+            <button onclick="registerUser()">Registrieren</button>
+            <button onclick="loginUser()">Einloggen</button>
+        </div>
     </div>
 
     <div class="container">
@@ -184,6 +188,24 @@
                     <button onclick="checkout()" style="background: var(--red); color: white; padding: 12px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer;">Kostenpflichtig bestellen</button>
                 </div>
             </div>
+
+            <!-- MEINE BESTELLUNGEN (HISTORIE) -->
+            <div class="history-box">
+                <h2>📜 Meine Bestell-Historie</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Bestellung</th>
+                            <th>Typ</th>
+                            <th>Gesamt</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="user-history-list">
+                        <tr><td colspan="4">Bitte logge dich ein, um deine Bestellungen zu sehen.</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- ADMIN VIEW -->
@@ -211,7 +233,6 @@
     </div>
 
     <script>
-        // Deine Firebase-Zugangsdaten:
         const firebaseConfig = {
             apiKey: "AIzaSyBXd4QWbxZUcqcqBCpVNhZM1v7NZR_OC1A",
             authDomain: "mcstrip.firebaseapp.com",
@@ -223,7 +244,6 @@
             measurementId: "G-ESCGPK0XG2"
         };
 
-        // Firebase Initialisieren
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
@@ -231,21 +251,76 @@
         let cart = [];
 
         function updateUI() {
+            let userDisplay = document.getElementById('user-display');
+            let authButtons = document.getElementById('auth-buttons');
+
             if(currentUser) {
-                document.getElementById('user-display').innerText = "Eingeloggt als: " + currentUser;
+                userDisplay.innerHTML = `Eingeloggt als: <strong>${currentUser}</strong>`;
+                authButtons.innerHTML = `<button class="logout-btn" onclick="logoutUser()">Ausloggen</button>`;
+                loadUserHistory();
             } else {
-                document.getElementById('user-display').innerText = "Nicht eingeloggt";
+                userDisplay.innerText = "Nicht eingeloggt";
+                authButtons.innerHTML = `
+                    <button onclick="registerUser()">Registrieren</button>
+                    <button onclick="loginUser()">Einloggen</button>
+                `;
+                document.getElementById('user-history-list').innerHTML = `<tr><td colspan="4">Bitte logge dich ein, um deine Bestellungen zu sehen.</td></tr>`;
             }
             renderCart();
         }
 
+        // Account Registrieren
+        function registerUser() {
+            let name = prompt("Wähle einen Minecraft-Namen:");
+            if(!name || name.trim() === "") return;
+            name = name.trim();
+
+            let pass = prompt("Wähle ein Passwort:");
+            if(!pass || pass.trim() === "") return;
+
+            database.ref('users/' + name).once('value', (snapshot) => {
+                if(snapshot.exists()) {
+                    alert("Dieser Spielername ist bereits registriert! Bitte logge dich ein.");
+                } else {
+                    database.ref('users/' + name).set({ password: pass }).then(() => {
+                        alert("Account erfolgreich erstellt! Du bist jetzt eingeloggt.");
+                        currentUser = name;
+                        localStorage.setItem('mc_username', currentUser);
+                        updateUI();
+                    });
+                }
+            });
+        }
+
+        // Account Einloggen
         function loginUser() {
-            let name = prompt("Gib deinen Minecraft-Namen ein:");
-            if(name && name.trim() !== "") {
-                currentUser = name.trim();
-                localStorage.setItem('mc_username', currentUser);
-                updateUI();
-            }
+            let name = prompt("Dein Minecraft-Name:");
+            if(!name || name.trim() === "") return;
+            name = name.trim();
+
+            let pass = prompt("Dein Passwort:");
+            if(!pass) return;
+
+            database.ref('users/' + name).once('value', (snapshot) => {
+                let user = snapshot.val();
+                if(user && user.password === pass) {
+                    currentUser = name;
+                    localStorage.setItem('mc_username', currentUser);
+                    updateUI();
+                    alert("Erfolgreich eingeloggt!");
+                } else {
+                    alert("Falscher Name oder falsches Passwort!");
+                }
+            });
+        }
+
+        // Ausloggen
+        function logoutUser() {
+            currentUser = null;
+            localStorage.removeItem('mc_username');
+            cart = [];
+            updateUI();
+            alert("Erfolgreich ausgeloggt.");
         }
 
         function switchView(view) {
@@ -262,6 +337,12 @@
         }
 
         function addToCart(item, price) {
+            // LOGIN-PFLICHT VOR DEM HINZUFÜGEN ZUM WARENKORB
+            if(!currentUser) {
+                alert("Du musst dich zuerst einloggen oder registrieren, um bestellen zu können!");
+                loginUser();
+                return;
+            }
             cart.push({item, price});
             renderCart();
         }
@@ -289,8 +370,9 @@
         }
 
         function checkout() {
+            // LOGIN-PFLICHT BEIM BESTELLEN
             if(!currentUser) {
-                alert("Bitte logge dich zuerst mit deinem Minecraft-Namen ein!");
+                alert("Du musst dich zuerst einloggen oder registrieren, um zu bestellen!");
                 loginUser();
                 return;
             }
@@ -313,13 +395,46 @@
                 type: type,
                 coords: type === 'Lieferservice' ? coords : 'Vor Ort',
                 items: cart.map(i => i.item).join(', '),
-                total: cart.reduce((a, b) => a + b.price, 0)
+                total: cart.reduce((a, b) => a + b.price, 0),
+                status: 'In Bearbeitung'
             }).then(() => {
                 alert("Bestellung erfolgreich aufgegeben!");
                 cart = [];
                 renderCart();
+                loadUserHistory();
             }).catch(error => {
                 alert("Fehler beim Senden: " + error.message);
+            });
+        }
+
+        // Eigene Bestell-Historie laden
+        function loadUserHistory() {
+            if(!currentUser) return;
+            database.ref('orders').on('value', (snapshot) => {
+                let tbody = document.getElementById('user-history-list');
+                tbody.innerHTML = "";
+                let orders = snapshot.val();
+                let hasOrders = false;
+
+                if(orders) {
+                    for(let key in orders) {
+                        let o = orders[key];
+                        if(o.user === currentUser) {
+                            hasOrders = true;
+                            tbody.innerHTML += `
+                                <tr>
+                                    <td>${o.items}</td>
+                                    <td>${o.type}</td>
+                                    <td>${o.total} Dias</td>
+                                    <td><span style="color: var(--yellow); font-weight: bold;">${o.status || 'Offen'}</span></td>
+                                </tr>
+                            `;
+                        }
+                    }
+                }
+                if(!hasOrders) {
+                    tbody.innerHTML = "<tr><td colspan='4'>Du hast noch keine Bestellungen aufgegeben.</td></tr>";
+                }
             });
         }
 
