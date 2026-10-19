@@ -89,7 +89,7 @@
         .card button:hover { background: #e0ac24; }
 
         /* Warenkorb & Historie */
-        .cart-box, .history-box { 
+        .cart-box, .history-box, .admin-box { 
             background: var(--card-bg); 
             padding: 20px; 
             border-radius: 12px; 
@@ -114,6 +114,8 @@
         th { background: var(--red); color: white; }
         .status-btn { background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .status-btn:hover { background: #218838; }
+        .reset-btn { background: #ffc107; color: black; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 5px; }
+        .delete-btn { background: var(--red); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -210,24 +212,44 @@
 
         <!-- ADMIN VIEW -->
         <div id="admin-view" class="view-section">
-            <h2 style="color: var(--yellow);">⚙️ Admin Dashboard - Live Bestellungen</h2>
-            <p style="margin-bottom: 15px; font-size: 14px;">Alle Online-Bestellungen deiner Freunde kommen hier live an.</p>
+            <h2 style="color: var(--yellow);">⚙️ Admin Dashboard</h2>
             
-            <table>
-                <thead>
-                    <tr>
-                        <th>Spieler</th>
-                        <th>Typ</th>
-                        <th>Koordinaten</th>
-                        <th>Bestellung</th>
-                        <th>Gesamt</th>
-                        <th>Aktion</th>
-                    </tr>
-                </thead>
-                <tbody id="admin-orders-list">
-                    <tr><td colspan="6">Lade Bestellungen...</td></tr>
-                </tbody>
-            </table>
+            <!-- BESTELLUNGEN TABELLE -->
+            <div class="admin-box" style="margin-top: 15px;">
+                <h3>📦 Live-Bestellungen</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Spieler</th>
+                            <th>Typ</th>
+                            <th>Koordinaten</th>
+                            <th>Bestellung</th>
+                            <th>Gesamt</th>
+                            <th>Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-orders-list">
+                        <tr><td colspan="6">Lade Bestellungen...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- BENUTZERVERWALTUNG TABELLE -->
+            <div class="admin-box">
+                <h3>👥 Registered Accounts & Passwort-Verwaltung</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Minecraft Name</th>
+                            <th>Passwort</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-users-list">
+                        <tr><td colspan="3">Lade Benutzer...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
     </div>
@@ -331,13 +353,13 @@
                     return;
                 }
                 listenForOrders();
+                listenForUsers(); // Lädt zusätzlich die Spielerdatenbank für Admins
             }
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.getElementById(view + '-view').classList.add('active');
         }
 
         function addToCart(item, price) {
-            // LOGIN-PFLICHT VOR DEM HINZUFÜGEN ZUM WARENKORB
             if(!currentUser) {
                 alert("Du musst dich zuerst einloggen oder registrieren, um bestellen zu können!");
                 loginUser();
@@ -370,7 +392,6 @@
         }
 
         function checkout() {
-            // LOGIN-PFLICHT BEIM BESTELLEN
             if(!currentUser) {
                 alert("Du musst dich zuerst einloggen oder registrieren, um zu bestellen!");
                 loginUser();
@@ -438,6 +459,7 @@
             });
         }
 
+        // Live-Bestellungen für Admin laden
         function listenForOrders() {
             database.ref('orders').on('value', (snapshot) => {
                 let tbody = document.getElementById('admin-orders-list');
@@ -463,6 +485,53 @@
                     `;
                 }
             });
+        }
+
+        // Benutzerliste für Admin laden
+        function listenForUsers() {
+            database.ref('users').on('value', (snapshot) => {
+                let tbody = document.getElementById('admin-users-list');
+                tbody.innerHTML = "";
+                let users = snapshot.val();
+
+                if(!users) {
+                    tbody.innerHTML = "<tr><td colspan='3'>Keine registrierten Accounts gefunden.</td></tr>";
+                    return;
+                }
+
+                for(let username in users) {
+                    let userData = users[username];
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${username}</strong></td>
+                            <td><code>${userData.password}</code></td>
+                            <td>
+                                <button class="reset-btn" onclick="resetUserPassword('${username}')">Passwort ändern</button>
+                                <button class="delete-btn" onclick="deleteUserAccount('${username}')">Löschen</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+            });
+        }
+
+        // Admin-Funktion: Passwort eines Spielers ändern
+        function resetUserPassword(username) {
+            let newPass = prompt(`Neues Passwort für ${username} eingeben:`);
+            if(newPass && newPass.trim() !== "") {
+                database.ref('users/' + username).update({ password: newPass.trim() }).then(() => {
+                    alert(`Passwort für ${username} wurde erfolgreich geändert!`);
+                });
+            }
+        }
+
+        // Admin-Funktion: Account löschen
+        function deleteUserAccount(username) {
+            if(confirm(`Möchtest du den Account von ${username} wirklich löschen?`)) {
+                database.ref('users/' + username).remove().then(() => {
+                    alert(`Account ${username} wurde gelöscht.`);
+                });
+            }
         }
 
         function completeOrder(key) {
