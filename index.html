@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>McStrip - Fast Food & High Entertainment</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDKs für Live-Datenbank -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        :root { 
+            --red: #DA291C; 
+            --yellow: #FFC72C; 
+            --dark: #121212; 
+            --card-bg: #1e1e1e; 
+            --text: #ffffff; 
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+        body { background-color: var(--dark); color: var(--text); padding-bottom: 50px; }
+
+        /* Header / Nav */
+        header { 
+            background-color: #000; 
+            border-bottom: 3px solid var(--yellow); 
+            padding: 15px 30px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+        }
+        .logo { font-size: 28px; font-weight: 800; color: var(--yellow); text-transform: uppercase; letter-spacing: 1px; }
+        .logo span { color: var(--red); }
+        nav button { 
+            background: var(--red); 
+            color: white; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 20px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            margin-left: 10px; 
+            transition: 0.2s;
+        }
+        nav button:hover { background: var(--yellow); color: black; }
+
+        /* User Bar */
+        .user-bar { background: #222; padding: 10px 30px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; border-bottom: 1px solid #333; }
+        .user-bar button { background: none; border: none; color: var(--yellow); cursor: pointer; text-decoration: underline; font-weight: 600; }
+
+        /* Container & Views */
+        .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+
+        /* Card Grid */
+        .category-title { color: var(--yellow); margin: 25px 0 15px; font-size: 22px; border-bottom: 2px solid var(--red); padding-bottom: 5px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+        .card { 
+            background: var(--card-bg); 
+            border-radius: 12px; 
+            padding: 20px; 
+            text-align: center; 
+            border: 1px solid #333; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: space-between; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .card h3 { color: var(--yellow); margin-bottom: 10px; }
+        .card p { font-size: 14px; color: #ccc; margin-bottom: 15px; }
+        .card .price { font-weight: bold; font-size: 18px; color: #fff; margin-bottom: 15px; }
+        .card button { 
+            background: var(--yellow); 
+            color: black; 
+            border: none; 
+            padding: 10px; 
+            border-radius: 6px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: 0.2s;
+        }
+        .card button:hover { background: #e0ac24; }
+
+        /* Warenkorb */
+        .cart-box { 
+            background: var(--card-bg); 
+            padding: 20px; 
+            border-radius: 12px; 
+            margin-top: 30px; 
+            border: 2px solid var(--yellow); 
+        }
+        .cart-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #333; }
+        .checkout-form { margin-top: 20px; display: grid; gap: 15px; }
+        input, select { 
+            width: 100%; 
+            padding: 10px; 
+            background: #333; 
+            border: 1px solid #555; 
+            color: white; 
+            border-radius: 6px; 
+            outline: none;
+        }
+
+        /* Admin Table */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: var(--card-bg); border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; font-size: 14px; }
+        th { background: var(--red); color: white; }
+        .status-btn { background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .status-btn:hover { background: #218838; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo"><span>Mc</span>Strip</div>
+        <nav>
+            <button onclick="switchView('shop')">Speisekarte & Services</button>
+            <button onclick="switchView('admin')">Admin Modus</button>
+        </nav>
+    </header>
+
+    <div class="user-bar">
+        <span id="user-display">Nicht eingeloggt</span>
+        <button onclick="loginUser()">Spieler Login</button>
+    </div>
+
+    <div class="container">
+        
+        <!-- SHOP VIEW -->
+        <div id="shop-view" class="view-section active">
+            <h2 class="category-title">🍔 Fast Food Menu</h2>
+            <div class="grid">
+                <div class="card">
+                    <div><h3>McErotik Burger</h3><p>Extra saftig mit Spezialsoße.</p></div>
+                    <div><div class="price">15 $</div><button onclick="addToCart('McErotik Burger', 15)">In den Warenkorb</button></div>
+                </div>
+                <div class="card">
+                    <div><h3>VIP Menü</h3><p>Burger, Pommes, VIP-Getränk & Dance-Gutschein.</p></div>
+                    <div><div class="price">50 $</div><button onclick="addToCart('VIP Menü', 50)">In den Warenkorb</button></div>
+                </div>
+                <div class="card">
+                    <div><h3>Hot Fries</h3><p>Scharfe Fritten für heiße Nächte.</p></div>
+                    <div><div class="price">8 $</div><button onclick="addToCart('Hot Fries', 8)">In den Warenkorb</button></div>
+                </div>
+            </div>
+
+            <h2 class="category-title">💃 Exclusive Strip Services</h2>
+            <div class="grid">
+                <div class="card">
+                    <div><h3>Private Lapdance</h3><p>10 Minuten Exklusivtanz in der VIP-Lounge.</p></div>
+                    <div><div class="price">100 $</div><button onclick="addToCart('Private Lapdance', 100)">In den Warenkorb</button></div>
+                </div>
+                <div class="card">
+                    <div><h3>Table Dance (30 Min)</h3><p>Tänzer/in direkt an deinem Tisch im Club.</p></div>
+                    <div><div class="price">250 $</div><button onclick="addToCart('Table Dance (30 Min)', 250)">In den Warenkorb</button></div>
+                </div>
+                <div class="card">
+                    <div><h3>Hausbesuch (Delivery Dance)</h3><p>Tänzer/in kommt zu deinen Minecraft-Koordinaten.</p></div>
+                    <div><div class="price">500 $</div><button onclick="addToCart('Hausbesuch Service', 500)">In den Warenkorb</button></div>
+                </div>
+            </div>
+
+            <!-- WARENKORB -->
+            <div class="cart-box">
+                <h2>🛒 Dein Warenkorb</h2>
+                <div id="cart-items" style="margin: 15px 0;">Keine Artikel im Warenkorb.</div>
+                <p><strong>Gesamt: <span id="cart-total">0</span> $</strong></p>
+
+                <div class="checkout-form">
+                    <label>Art der Lieferung:</label>
+                    <select id="order-type" onchange="toggleCoords()">
+                        <option value="Im Restaurant">Vor Ort im Restaurant essen / genießen</option>
+                        <option value="Lieferservice">Lieferservice (Minecraft Coordinates)</option>
+                    </select>
+
+                    <input type="text" id="mc-coords" placeholder="MC Koordinaten (z.B. X: 120, Y: 64, Z: -450)" style="display:none;">
+
+                    <button onclick="checkout()" style="background: var(--red); color: white; padding: 12px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer;">Kostenpflichtig bestellen</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADMIN VIEW -->
+        <div id="admin-view" class="view-section">
+            <h2 style="color: var(--yellow);">⚙️ Admin Dashboard - Live Bestellungen</h2>
+            <p style="margin-bottom: 15px; font-size: 14px;">Alle Online-Bestellungen deiner Freunde kommen hier live an.</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Spieler</th>
+                        <th>Typ</th>
+                        <th>Koordinaten</th>
+                        <th>Bestellung</th>
+                        <th>Gesamt</th>
+                        <th>Aktion</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-orders-list">
+                    <tr><td colspan="6">Lade Bestellungen...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+        // Deine Firebase-Zugangsdaten sind hier eingebaut:
+        const firebaseConfig = {
+            apiKey: "AIzaSyBXd4QWbxZUcqcqBCpVNhZM1v7NZR_OC1A",
+            authDomain: "mcstrip.firebaseapp.com",
+            databaseURL: "https://mcstrip-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "mcstrip",
+            storageBucket: "mcstrip.firebasestorage.app",
+            messagingSenderId: "924160085820",
+            appId: "1:924160085820:web:a8cbe320891e40f3b25839",
+            measurementId: "G-ESCGPK0XG2"
+        };
+
+        // Firebase Initialisieren
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let currentUser = localStorage.getItem('mc_username') || null;
+        let cart = [];
+
+        function updateUI() {
+            if(currentUser) {
+                document.getElementById('user-display').innerText = "Eingeloggt als: " + currentUser;
+            } else {
+                document.getElementById('user-display').innerText = "Nicht eingeloggt";
+            }
+            renderCart();
+        }
+
+        function loginUser() {
+            let name = prompt("Gib deinen Minecraft-Namen ein:");
+            if(name && name.trim() !== "") {
+                currentUser = name.trim();
+                localStorage.setItem('mc_username', currentUser);
+                updateUI();
+            }
+        }
+
+        function switchView(view) {
+            if(view === 'admin') {
+                let pass = prompt("Admin-Passwort eingeben:");
+                if(pass !== "admin123") {
+                    alert("Falsches Passwort!");
+                    return;
+                }
+                listenForOrders();
+            }
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.getElementById(view + '-view').classList.add('active');
+        }
+
+        function addToCart(item, price) {
+            cart.push({item, price});
+            renderCart();
+        }
+
+        function renderCart() {
+            let list = document.getElementById('cart-items');
+            let totalEl = document.getElementById('cart-total');
+            if(cart.length === 0) {
+                list.innerHTML = "Keine Artikel im Warenkorb.";
+                totalEl.innerText = "0";
+                return;
+            }
+            list.innerHTML = "";
+            let total = 0;
+            cart.forEach((c) => {
+                total += c.price;
+                list.innerHTML += `<div class="cart-item"><span>${c.item}</span> <span>${c.price} $</span></div>`;
+            });
+            totalEl.innerText = total;
+        }
+
+        function toggleCoords() {
+            let type = document.getElementById('order-type').value;
+            document.getElementById('mc-coords').style.display = (type === 'Lieferservice') ? 'block' : 'none';
+        }
+
+        function checkout() {
+            if(!currentUser) {
+                alert("Bitte logge dich zuerst mit deinem Minecraft-Namen ein!");
+                loginUser();
+                return;
+            }
+            if(cart.length === 0) {
+                alert("Dein Warenkorb ist leer!");
+                return;
+            }
+
+            let type = document.getElementById('order-type').value;
+            let coords = document.getElementById('mc-coords').value;
+
+            if(type === 'Lieferservice' && !coords) {
+                alert("Bitte gib deine Minecraft-Koordinaten ein!");
+                return;
+            }
+
+            let newOrderRef = database.ref('orders').push();
+            newOrderRef.set({
+                user: currentUser,
+                type: type,
+                coords: type === 'Lieferservice' ? coords : 'Vor Ort',
+                items: cart.map(i => i.item).join(', '),
+                total: cart.reduce((a, b) => a + b.price, 0)
+            }).then(() => {
+                alert("Bestellung erfolgreich aufgegeben!");
+                cart = [];
+                renderCart();
+            }).catch(error => {
+                alert("Fehler beim Senden: " + error.message);
+            });
+        }
+
+        function listenForOrders() {
+            database.ref('orders').on('value', (snapshot) => {
+                let tbody = document.getElementById('admin-orders-list');
+                tbody.innerHTML = "";
+                let orders = snapshot.val();
+
+                if(!orders) {
+                    tbody.innerHTML = "<tr><td colspan='6'>Keine offenen Bestellungen.</td></tr>";
+                    return;
+                }
+
+                for(let key in orders) {
+                    let o = orders[key];
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${o.user}</strong></td>
+                            <td>${o.type}</td>
+                            <td>${o.coords}</td>
+                            <td>${o.items}</td>
+                            <td>${o.total} $</td>
+                            <td><button class="status-btn" onclick="completeOrder('${key}')">Erledigt</button></td>
+                        </tr>
+                    `;
+                }
+            });
+        }
+
+        function completeOrder(key) {
+            database.ref('orders/' + key).remove();
+        }
+
+        updateUI();
+    </script>
+</body>
+</html>
