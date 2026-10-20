@@ -88,6 +88,39 @@
         }
         .card button:hover { background: #e0ac24; }
 
+        /* Fight Card Styling */
+        .fight-card {
+            background: var(--card-bg);
+            border: 2px solid var(--red);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .fight-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .fight-vs {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            font-size: 22px;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        .fighter-box {
+            background: #252525;
+            padding: 15px;
+            border-radius: 8px;
+            width: 40%;
+            text-align: center;
+            border: 1px solid var(--yellow);
+        }
+
         /* Warenkorb, Historie & Admin */
         .cart-box, .history-box, .admin-box, .legal-box { 
             background: var(--card-bg); 
@@ -178,6 +211,7 @@
         <div class="logo"><span>Mc</span>Strip</div>
         <nav>
             <button onclick="switchView('shop')">Speisekarte & Services</button>
+            <button onclick="switchView('fights')">⚔️ Kämpfe & Wetten</button>
             <button onclick="switchView('admin')">Admin Modus</button>
         </nav>
     </header>
@@ -255,7 +289,6 @@
                     <select id="order-type" onchange="toggleCoords()">
                         <option value="Im Restaurant">Vor Ort im Restaurant essen / genießen</option>
                         <option value="Lieferservice">Lieferservice (Minecraft Coordinates)</option>
-                        <option value="Lieferung zum Casino">Lieferung zum Casino</option>
                     </select>
 
                     <input type="text" id="mc-coords" placeholder="MC Koordinaten (z.B. X: 120, Y: 64, Z: -450)" style="display:none;">
@@ -290,12 +323,50 @@
             </div>
         </div>
 
+        <!-- FIGHTS & BETS VIEW -->
+        <div id="fights-view" class="view-section">
+            <h2 class="category-title">⚔️ Anstehende Kämpfe & Wetten</h2>
+            <p style="margin-bottom: 20px; color: #ccc;">Platziere deine Wetten in Dias auf den Sieger! Die Auszahlung erfolgt nach dem Kampf durch die Admins.</p>
+            
+            <div id="fights-container">
+                <p>Lade Kämpfe...</p>
+            </div>
+        </div>
+
         <!-- ADMIN VIEW -->
         <div id="admin-view" class="view-section">
             <h2 style="color: var(--yellow);">⚙️ Admin Dashboard</h2>
 
-            <!-- RABATTCODES ERSTELLEN & VERWALTEN -->
+            <!-- NEUEN KAMPF ERSTELLEN -->
             <div class="admin-box" style="margin-top: 15px;">
+                <h3>⚔️ Neuen Kampf ansetzen</h3>
+                <div class="admin-form-group">
+                    <input type="text" id="fight-p1" placeholder="Kämpfer 1 (Name)">
+                    <input type="text" id="fight-p2" placeholder="Kämpfer 2 (Name)">
+                    <input type="datetime-local" id="fight-time">
+                    <button onclick="createFight()">Kampf Veröffentlichen</button>
+                </div>
+            </div>
+
+            <!-- KÄMPFE VERWALTEN (GEWINNER FESTLEGEN) -->
+            <div class="admin-box">
+                <h3>🏆 Kämpfe verwalten & Gewinner eintragen</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Kampf</th>
+                            <th>Uhrzeit</th>
+                            <th>Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-fights-list">
+                        <tr><td colspan="3">Lade Kämpfe...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- RABATTCODES ERSTELLEN & VERWALTEN -->
+            <div class="admin-box">
                 <h3>🎟️ Rabattcodes & Gutscheine verwalten</h3>
                 <div class="admin-form-group">
                     <input type="text" id="new-code-name" placeholder="Code Name (z.B. RABATT20)">
@@ -402,7 +473,6 @@
         let activeDiscountPercent = 0;
         let appliedCouponCode = "";
 
-        // Automatische Account-Prüfung beim Laden der Seite
         function initApp() {
             if(currentUser) {
                 database.ref('users/' + currentUser).once('value', (snapshot) => {
@@ -416,6 +486,7 @@
             } else {
                 updateUI();
             }
+            listenForPublicFights();
         }
 
         function updateUI() {
@@ -519,6 +590,7 @@
                 listenForOrders();
                 listenForUsers();
                 listenForCoupons();
+                listenForAdminFights();
             }
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.getElementById(view + '-view').classList.add('active');
@@ -569,7 +641,7 @@
             let statusEl = document.getElementById('coupon-status');
 
             if(!codeInput) {
-                statusEl.innerHTML = "<span style='color: var(--red);'>Bitte gib einen Code ein.!</span>";
+                statusEl.innerHTML = "<span style='color: var(--red);'>Bitte gib einen Code ein.</span>";
                 return;
             }
 
@@ -578,4 +650,375 @@
                 if(coupon) {
                     activeDiscountPercent = parseInt(coupon.percent);
                     appliedCouponCode = codeInput;
-                    statusEl.innerHTML = `<span style='color: #2
+                    statusEl.innerHTML = `<span style='color: #28a745;'>Gutschein "${codeInput}" (${coupon.percent}% Rabatt) wurde erfolgreich aktiviert!</span>`;
+                    renderCart();
+                } else {
+                    statusEl.innerHTML = "<span style='color: var(--red);'>Ungültiger oder abgelaufener Rabattcode!</span>";
+                }
+            });
+        }
+
+        function toggleCoords() {
+            let type = document.getElementById('order-type').value;
+            document.getElementById('mc-coords').style.display = (type === 'Lieferservice') ? 'block' : 'none';
+        }
+
+        function checkout() {
+            if(!currentUser) {
+                alert("Du musst dich zuerst einloggen oder registrieren, um zu bestellen!");
+                openRegisterModal();
+                return;
+            }
+            if(cart.length === 0) {
+                alert("Dein Warenkorb ist leer!");
+                return;
+            }
+
+            let type = document.getElementById('order-type').value;
+            let coords = document.getElementById('mc-coords').value;
+
+            if(type === 'Lieferservice' && !coords) {
+                alert("Bitte gib deine Minecraft-Koordinaten ein!");
+                return;
+            }
+
+            let originalTotal = cart.reduce((a, b) => a + b.price, 0);
+            let finalTotal = originalTotal;
+            if(activeDiscountPercent > 0) {
+                finalTotal = Math.round(originalTotal * (1 - activeDiscountPercent / 100));
+            }
+
+            let newOrderRef = database.ref('orders').push();
+            newOrderRef.set({
+                user: currentUser,
+                type: type,
+                coords: type === 'Lieferservice' ? coords : 'Vor Ort',
+                items: cart.map(i => i.item).join(', '),
+                total: finalTotal,
+                couponUsed: appliedCouponCode || 'Keiner',
+                status: 'In Bearbeitung'
+            }).then(() => {
+                alert("Bestellung erfolgreich aufgegeben!");
+                cart = [];
+                activeDiscountPercent = 0;
+                appliedCouponCode = "";
+                document.getElementById('coupon-code-input').value = "";
+                document.getElementById('coupon-status').innerText = "";
+                renderCart();
+                loadUserHistory();
+            }).catch(error => {
+                alert("Fehler beim Senden: " + error.message);
+            });
+        }
+
+        function loadUserHistory() {
+            if(!currentUser) return;
+            database.ref('orders').on('value', (snapshot) => {
+                let tbody = document.getElementById('user-history-list');
+                tbody.innerHTML = "";
+                let orders = snapshot.val();
+                let hasOrders = false;
+
+                if(orders) {
+                    for(let key in orders) {
+                        let o = orders[key];
+                        if(o.user === currentUser) {
+                            hasOrders = true;
+                            tbody.innerHTML += `
+                                <tr>
+                                    <td>${o.items}</td>
+                                    <td>${o.type}</td>
+                                    <td>${o.total} Dias</td>
+                                    <td><span style="color: var(--yellow); font-weight: bold;">${o.status || 'Offen'}</span></td>
+                                </tr>
+                            `;
+                        }
+                    }
+                }
+                if(!hasOrders) {
+                    tbody.innerHTML = "<tr><td colspan='4'>Du hast noch keine Bestellungen aufgegeben.</td></tr>";
+                }
+            });
+        }
+
+        /* --- KÄMPFE & WETTEN LOGIK --- */
+
+        // ADMIN: Kampf erstellen
+        function createFight() {
+            let p1 = document.getElementById('fight-p1').value.trim();
+            let p2 = document.getElementById('fight-p2').value.trim();
+            let time = document.getElementById('fight-time').value;
+
+            if(!p1 || !p2 || !time) {
+                alert("Bitte gib beide Kämpfer und die Uhrzeit ein!");
+                return;
+            }
+
+            let formattedTime = new Date(time).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+
+            database.ref('fights').push().set({
+                player1: p1,
+                player2: p2,
+                time: formattedTime,
+                status: 'Aktiv',
+                winner: null
+            }).then(() => {
+                alert("Kampf erfolgreich angesetzt!");
+                document.getElementById('fight-p1').value = "";
+                document.getElementById('fight-p2').value = "";
+                document.getElementById('fight-time').value = "";
+            });
+        }
+
+        // ÖFFENTLICH: Kämpfe und Wetten anzeigen
+        function listenForPublicFights() {
+            database.ref('fights').on('value', (snapshot) => {
+                let container = document.getElementById('fights-container');
+                container.innerHTML = "";
+                let fights = snapshot.val();
+
+                if(!fights) {
+                    container.innerHTML = "<p>Aktuell stehen keine Kämpfe an.</p>";
+                    return;
+                }
+
+                for(let key in fights) {
+                    let f = fights[key];
+                    let bets = f.bets || {};
+                    let totalPool = 0;
+                    let p1Bets = 0;
+                    let p2Bets = 0;
+
+                    for(let bKey in bets) {
+                        let b = bets[bKey];
+                        totalPool += b.amount;
+                        if(b.fighter === f.player1) p1Bets += b.amount;
+                        if(b.fighter === f.player2) p2Bets += b.amount;
+                    }
+
+                    container.innerHTML += `
+                        <div class="fight-card">
+                            <div class="fight-header">
+                                <span style="color:var(--yellow); font-weight:bold;">🕒 ${f.time} Uhr</span>
+                                <span style="color:${f.status === 'Aktiv' ? '#28a745' : 'var(--red)'}; font-weight:bold;">${f.status === 'Aktiv' ? '● WETTEN OFFEN' : 'BEENDET (' + (f.winner ? 'Sieger: ' + f.winner : '') + ')'}</span>
+                            </div>
+                            <div class="fight-vs">
+                                <div class="fighter-box">
+                                    <h3>${f.player1}</h3>
+                                    <small style="color:#aaa;">Wetten: ${p1Bets} Dias</small>
+                                </div>
+                                <span style="color:var(--red); font-size:28px;">VS</span>
+                                <div class="fighter-box">
+                                    <h3>${f.player2}</h3>
+                                    <small style="color:#aaa;">Wetten: ${p2Bets} Dias</small>
+                                </div>
+                            </div>
+                            <div style="text-align:center; margin-top:10px;">
+                                <p style="font-size:14px; margin-bottom:10px;">💰 Gesamter Wett-Topf: <strong>${totalPool} Dias</strong></p>
+                                ${f.status === 'Aktiv' ? `
+                                    <button onclick="placeBet('${key}', '${f.player1}')" style="background:var(--yellow); border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer; margin-right:10px;">Auf ${f.player1} wetten</button>
+                                    <button onclick="placeBet('${key}', '${f.player2}')" style="background:var(--yellow); border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer;">Auf ${f.player2} wetten</button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        // Wette platzieren
+        function placeBet(fightKey, fighterName) {
+            if(!currentUser) {
+                alert("Du musst eingeloggt sein, um eine Wette abzugeben!");
+                openRegisterModal();
+                return;
+            }
+
+            let amount = prompt(`Wie viele Dias möchtest du auf ${fighterName} setzen?`);
+            if(!amount || isNaN(amount) || parseInt(amount) <= 0) {
+                alert("Ungültiger Wettbetrag!");
+                return;
+            }
+
+            database.ref(`fights/${fightKey}/bets`).push().set({
+                user: currentUser,
+                fighter: fighterName,
+                amount: parseInt(amount)
+            }).then(() => {
+                alert(`Wette erfolgreich platziert! ${amount} Dias auf ${fighterName}.`);
+            });
+        }
+
+        // ADMIN: Kämpfe verwalten & Gewinner setzen
+        function listenForAdminFights() {
+            database.ref('fights').on('value', (snapshot) => {
+                let tbody = document.getElementById('admin-fights-list');
+                tbody.innerHTML = "";
+                let fights = snapshot.val();
+
+                if(!fights) {
+                    tbody.innerHTML = "<tr><td colspan='3'>Keine Kämpfe vorhanden.</td></tr>";
+                    return;
+                }
+
+                for(let key in fights) {
+                    let f = fights[key];
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${f.player1} VS ${f.player2}</strong></td>
+                            <td>${f.time}</td>
+                            <td>
+                                ${f.status === 'Aktiv' ? `
+                                    <button class="status-btn" onclick="setWinner('${key}', '${f.player1}')">${f.player1} Gewinnt</button>
+                                    <button class="status-btn" onclick="setWinner('${key}', '${f.player2}')">${f.player2} Gewinnt</button>
+                                ` : `Sieger: <strong>${f.winner}</strong>`}
+                                <button class="delete-btn" onclick="deleteFight('${key}')" style="margin-left:5px;">Löschen</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+            });
+        }
+
+        function setWinner(fightKey, winnerName) {
+            if(confirm(`Möchtest du ${winnerName} als Gewinner eintragen?`)) {
+                database.ref(`fights/${fightKey}`).update({
+                    status: 'Beendet',
+                    winner: winnerName
+                });
+            }
+        }
+
+        function deleteFight(fightKey) {
+            if(confirm("Möchtest du diesen Kampf löschen?")) {
+                database.ref(`fights/${fightKey}`).remove();
+            }
+        }
+
+        function createDiscountCode() {
+            let codeName = document.getElementById('new-code-name').value.trim().toUpperCase();
+            let codePercent = parseInt(document.getElementById('new-code-percent').value);
+
+            if(!codeName || isNaN(codePercent) || codePercent < 1 || codePercent > 100) {
+                alert("Bitte gib einen gültigen Code-Namen und einen Prozentwert zwischen 1 und 100 ein!");
+                return;
+            }
+
+            database.ref('coupons/' + codeName).set({
+                percent: codePercent
+            }).then(() => {
+                alert(`Rabattcode "${codeName}" (${codePercent}%) erfolgreich erstellt!`);
+                document.getElementById('new-code-name').value = "";
+                document.getElementById('new-code-percent').value = "";
+            });
+        }
+
+        function listenForCoupons() {
+            database.ref('coupons').on('value', (snapshot) => {
+                let tbody = document.getElementById('admin-coupons-list');
+                tbody.innerHTML = "";
+                let coupons = snapshot.val();
+
+                if(!coupons) {
+                    tbody.innerHTML = "<tr><td colspan='3'>Keine aktiven Rabattcodes vorhanden.</td></tr>";
+                    return;
+                }
+
+                for(let code in coupons) {
+                    let c = coupons[code];
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${code}</strong></td>
+                            <td>${c.percent} %</td>
+                            <td><button class="delete-btn" onclick="deleteCoupon('${code}')">Löschen</button></td>
+                        </tr>
+                    `;
+                }
+            });
+        }
+
+        function deleteCoupon(code) {
+            if(confirm(`Möchtest du den Rabattcode "${code}" wirklich löschen?`)) {
+                database.ref('coupons/' + code).remove();
+            }
+        }
+
+        function listenForOrders() {
+            database.ref('orders').on('value', (snapshot) => {
+                let tbody = document.getElementById('admin-orders-list');
+                tbody.innerHTML = "";
+                let orders = snapshot.val();
+
+                if(!orders) {
+                    tbody.innerHTML = "<tr><td colspan='6'>Keine offenen Bestellungen.</td></tr>";
+                    return;
+                }
+
+                for(let key in orders) {
+                    let o = orders[key];
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${o.user}</strong></td>
+                            <td>${o.type}</td>
+                            <td>${o.coords}</td>
+                            <td>${o.items} ${o.couponUsed && o.couponUsed !== 'Keiner' ? `<br><small style="color:var(--yellow);">(Gutschein: ${o.couponUsed})</small>` : ''}</td>
+                            <td>${o.total} Dias</td>
+                            <td><button class="status-btn" onclick="completeOrder('${key}')">Erledigt</button></td>
+                        </tr>
+                    `;
+                }
+            });
+        }
+
+        function listenForUsers() {
+            database.ref('users').on('value', (snapshot) => {
+                let tbody = document.getElementById('admin-users-list');
+                tbody.innerHTML = "";
+                let users = snapshot.val();
+
+                if(!users) {
+                    tbody.innerHTML = "<tr><td colspan='3'>Keine registrierten Accounts gefunden.</td></tr>";
+                    return;
+                }
+
+                for(let username in users) {
+                    let userData = users[username];
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${username}</strong></td>
+                            <td><code>${userData.password}</code></td>
+                            <td>
+                                <button class="reset-btn" onclick="resetUserPassword('${username}')">Passwort ändern</button>
+                                <button class="delete-btn" onclick="deleteUserAccount('${username}')">Löschen</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+            });
+        }
+
+        function resetUserPassword(username) {
+            let newPass = prompt(`Neues Passwort für ${username} eingeben:`);
+            if(newPass && newPass.trim() !== "") {
+                database.ref('users/' + username).update({ password: newPass.trim() }).then(() => {
+                    alert(`Passwort für ${username} wurde erfolgreich geändert!`);
+                });
+            }
+        }
+
+        function deleteUserAccount(username) {
+            if(confirm(`Möchtest du den Account von ${username} wirklich löschen?`)) {
+                database.ref('users/' + username).remove().then(() => {
+                    alert(`Account ${username} wurde gelöscht.`);
+                });
+            }
+        }
+
+        function completeOrder(key) {
+            database.ref('orders/' + key).remove();
+        }
+
+        initApp();
+    </script>
+</body>
+</html>
