@@ -88,7 +88,7 @@
         }
         .card button:hover { background: #e0ac24; }
 
-        /* Warenkorb, Historie & Modal / Legal */
+        /* Warenkorb, Historie & Admin */
         .cart-box, .history-box, .admin-box, .legal-box { 
             background: var(--card-bg); 
             padding: 20px; 
@@ -98,6 +98,31 @@
         }
         .cart-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #333; }
         .checkout-form { margin-top: 20px; display: grid; gap: 15px; }
+        
+        .coupon-input-group { display: flex; gap: 10px; margin-top: 10px; }
+        .coupon-input-group input { flex: 1; }
+        .coupon-input-group button { 
+            background: var(--yellow); 
+            color: black; 
+            border: none; 
+            padding: 10px 18px; 
+            border-radius: 6px; 
+            font-weight: bold; 
+            cursor: pointer; 
+        }
+
+        .admin-form-group { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        .admin-form-group input { flex: 1; min-width: 150px; }
+        .admin-form-group button { 
+            background: #28a745; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 6px; 
+            font-weight: bold; 
+            cursor: pointer; 
+        }
+
         input, select { 
             width: 100%; 
             padding: 10px; 
@@ -169,7 +194,7 @@
         
         <!-- SHOP VIEW -->
         <div id="shop-view" class="view-section active">
-            <h2 class="category-title">🍔 Fast Food Menü</h2>
+            <h2 class="category-title">🍔 Fast Food Menu</h2>
             <div class="grid">
                 <div class="card">
                     <div><h3>McLinus</h3><p>Der legendäre Chefbürger mit Spezialsoße.</p></div>
@@ -209,7 +234,21 @@
             <div class="cart-box">
                 <h2>🛒 Dein Warenkorb</h2>
                 <div id="cart-items" style="margin: 15px 0;">Keine Artikel im Warenkorb.</div>
-                <p><strong>Gesamt: <span id="cart-total">0</span> Dias</strong></p>
+                
+                <!-- RABATTCODE FELD -->
+                <div style="margin-top: 15px; border-top: 1px solid #333; padding-top: 15px;">
+                    <label style="font-size: 14px; color: var(--yellow);">🎟️ Rabattcode / Gutschein:</label>
+                    <div class="coupon-input-group">
+                        <input type="text" id="coupon-code-input" placeholder="Gutscheincode eingeben (z.B. MCSTRIP10)">
+                        <button onclick="applyCoupon()">Anwenden</button>
+                    </div>
+                    <div id="coupon-status" style="font-size: 13px; margin-top: 5px;"></div>
+                </div>
+
+                <p style="margin-top: 15px; font-size: 18px;">
+                    <strong>Gesamt: <span id="cart-total">0</span> Dias</strong>
+                    <span id="discount-info" style="color: #28a745; font-size: 14px; margin-left: 10px;"></span>
+                </p>
 
                 <div class="checkout-form">
                     <label>Art der Lieferung:</label>
@@ -253,9 +292,32 @@
         <!-- ADMIN VIEW -->
         <div id="admin-view" class="view-section">
             <h2 style="color: var(--yellow);">⚙️ Admin Dashboard</h2>
+
+            <!-- RABATTCODES ERSTELLEN & VERWALTEN -->
+            <div class="admin-box" style="margin-top: 15px;">
+                <h3>🎟️ Rabattcodes & Gutscheine verwalten</h3>
+                <div class="admin-form-group">
+                    <input type="text" id="new-code-name" placeholder="Code Name (z.B. RABATT20)">
+                    <input type="number" id="new-code-percent" placeholder="Rabatt in % (z.B. 20)" min="1" max="100">
+                    <button onclick="createDiscountCode()">Code Erstellen</button>
+                </div>
+
+                <table style="margin-top: 20px;">
+                    <thead>
+                        <tr>
+                            <th>Gutscheincode</th>
+                            <th>Rabatt (%)</th>
+                            <th>Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-coupons-list">
+                        <tr><td colspan="3">Lade Gutscheine...</td></tr>
+                    </tbody>
+                </table>
+            </div>
             
             <!-- BESTELLUNGEN TABELLE -->
-            <div class="admin-box" style="margin-top: 15px;">
+            <div class="admin-box">
                 <h3>📦 Live-Bestellungen</h3>
                 <table>
                     <thead>
@@ -336,6 +398,8 @@
 
         let currentUser = localStorage.getItem('mc_username') || null;
         let cart = [];
+        let activeDiscountPercent = 0;
+        let appliedCouponCode = "";
 
         function updateUI() {
             let userDisplay = document.getElementById('user-display');
@@ -356,7 +420,6 @@
             renderCart();
         }
 
-        // Modal Steuerung
         function openRegisterModal() {
             document.getElementById('register-modal').style.display = 'flex';
         }
@@ -368,7 +431,6 @@
             document.getElementById('reg-terms').checked = false;
         }
 
-        // Registrierung mit AGB Check
         function submitRegistration() {
             let name = document.getElementById('reg-username').value.trim();
             let pass = document.getElementById('reg-password').value.trim();
@@ -424,6 +486,8 @@
             currentUser = null;
             localStorage.removeItem('mc_username');
             cart = [];
+            activeDiscountPercent = 0;
+            appliedCouponCode = "";
             updateUI();
             alert("Erfolgreich ausgeloggt.");
         }
@@ -437,6 +501,7 @@
                 }
                 listenForOrders();
                 listenForUsers();
+                listenForCoupons();
             }
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.getElementById(view + '-view').classList.add('active');
@@ -455,18 +520,54 @@
         function renderCart() {
             let list = document.getElementById('cart-items');
             let totalEl = document.getElementById('cart-total');
+            let discountInfo = document.getElementById('discount-info');
+
             if(cart.length === 0) {
                 list.innerHTML = "Keine Artikel im Warenkorb.";
                 totalEl.innerText = "0";
+                discountInfo.innerText = "";
                 return;
             }
+
             list.innerHTML = "";
-            let total = 0;
+            let originalTotal = 0;
             cart.forEach((c) => {
-                total += c.price;
+                originalTotal += c.price;
                 list.innerHTML += `<div class="cart-item"><span>${c.item}</span> <span>${c.price} Dias</span></div>`;
             });
-            totalEl.innerText = total;
+
+            let finalTotal = originalTotal;
+            if(activeDiscountPercent > 0) {
+                finalTotal = Math.round(originalTotal * (1 - activeDiscountPercent / 100));
+                discountInfo.innerText = `(${activeDiscountPercent}% Rabatt angewendet! Ersparnis: ${originalTotal - finalTotal} Dias)`;
+            } else {
+                discountInfo.innerText = "";
+            }
+
+            totalEl.innerText = finalTotal;
+        }
+
+        // Rabattcode prüfen und einlösen
+        function applyCoupon() {
+            let codeInput = document.getElementById('coupon-code-input').value.trim().toUpperCase();
+            let statusEl = document.getElementById('coupon-status');
+
+            if(!codeInput) {
+                statusEl.innerHTML = "<span style='color: var(--red);'>Bitte gib einen Code ein.</span>";
+                return;
+            }
+
+            database.ref('coupons/' + codeInput).once('value', (snapshot) => {
+                let coupon = snapshot.val();
+                if(coupon) {
+                    activeDiscountPercent = parseInt(coupon.percent);
+                    appliedCouponCode = codeInput;
+                    statusEl.innerHTML = `<span style='color: #28a745;'>Gutschein "${codeInput}" (${coupon.percent}% Rabatt) wurde erfolgreich aktiviert!</span>`;
+                    renderCart();
+                } else {
+                    statusEl.innerHTML = "<span style='color: var(--red);'>Ungültiger oder abgelaufener Rabattcode!</span>";
+                }
+            });
         }
 
         function toggleCoords() {
@@ -493,17 +594,28 @@
                 return;
             }
 
+            let originalTotal = cart.reduce((a, b) => a + b.price, 0);
+            let finalTotal = originalTotal;
+            if(activeDiscountPercent > 0) {
+                finalTotal = Math.round(originalTotal * (1 - activeDiscountPercent / 100));
+            }
+
             let newOrderRef = database.ref('orders').push();
             newOrderRef.set({
                 user: currentUser,
                 type: type,
                 coords: type === 'Lieferservice' ? coords : 'Vor Ort',
                 items: cart.map(i => i.item).join(', '),
-                total: cart.reduce((a, b) => a + b.price, 0),
+                total: finalTotal,
+                couponUsed: appliedCouponCode || 'Keiner',
                 status: 'In Bearbeitung'
             }).then(() => {
                 alert("Bestellung erfolgreich aufgegeben!");
                 cart = [];
+                activeDiscountPercent = 0;
+                appliedCouponCode = "";
+                document.getElementById('coupon-code-input').value = "";
+                document.getElementById('coupon-status').innerText = "";
                 renderCart();
                 loadUserHistory();
             }).catch(error => {
@@ -541,6 +653,57 @@
             });
         }
 
+        // ADMIN: Rabattcode Erstellen
+        function createDiscountCode() {
+            let codeName = document.getElementById('new-code-name').value.trim().toUpperCase();
+            let codePercent = parseInt(document.getElementById('new-code-percent').value);
+
+            if(!codeName || isNaN(codePercent) || codePercent < 1 || codePercent > 100) {
+                alert("Bitte gib einen gültigen Code-Namen und einen Prozentwert zwischen 1 und 100 ein!");
+                return;
+            }
+
+            database.ref('coupons/' + codeName).set({
+                percent: codePercent
+            }).then(() => {
+                alert(`Rabattcode "${codeName}" (${codePercent}%) erfolgreich erstellt!`);
+                document.getElementById('new-code-name').value = "";
+                document.getElementById('new-code-percent').value = "";
+            });
+        }
+
+        // ADMIN: Gutscheine auflisten
+        function listenForCoupons() {
+            database.ref('coupons').on('value', (snapshot) => {
+                let tbody = document.getElementById('admin-coupons-list');
+                tbody.innerHTML = "";
+                let coupons = snapshot.val();
+
+                if(!coupons) {
+                    tbody.innerHTML = "<tr><td colspan='3'>Keine aktiven Rabattcodes vorhanden.</td></tr>";
+                    return;
+                }
+
+                for(let code in coupons) {
+                    let c = coupons[code];
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${code}</strong></td>
+                            <td>${c.percent} %</td>
+                            <td><button class="delete-btn" onclick="deleteCoupon('${code}')">Löschen</button></td>
+                        </tr>
+                    `;
+                }
+            });
+        }
+
+        // ADMIN: Gutschein löschen
+        function deleteCoupon(code) {
+            if(confirm(`Möchtest du den Rabattcode "${code}" wirklich löschen?`)) {
+                database.ref('coupons/' + code).remove();
+            }
+        }
+
         function listenForOrders() {
             database.ref('orders').on('value', (snapshot) => {
                 let tbody = document.getElementById('admin-orders-list');
@@ -559,7 +722,7 @@
                             <td><strong>${o.user}</strong></td>
                             <td>${o.type}</td>
                             <td>${o.coords}</td>
-                            <td>${o.items}</td>
+                            <td>${o.items} ${o.couponUsed && o.couponUsed !== 'Keiner' ? `<br><small style="color:var(--yellow);">(Gutschein: ${o.couponUsed})</small>` : ''}</td>
                             <td>${o.total} Dias</td>
                             <td><button class="status-btn" onclick="completeOrder('${key}')">Erledigt</button></td>
                         </tr>
