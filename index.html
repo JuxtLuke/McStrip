@@ -608,7 +608,7 @@
         function switchView(view) {
             if(view === 'admin') {
                 let pass = prompt("Admin-Passwort eingeben:");
-                if(pass !== "67_admin_67") {
+                if(pass !== "67admin67") {
                     alert("Falsches Passwort!");
                     return;
                 }
@@ -823,9 +823,8 @@
 
                         betsHTML += `<div>• <strong>${b.user}</strong>: ${b.amount} Dias auf <strong>${b.fighter}</strong></div>`;
 
-                        // Gewinn-Berechnung für den aktuellen Spieler
                         if(f.status === 'Beendet' && f.winner && b.user === currentUser && b.fighter === f.winner) {
-                            userWonAmount += b.amount; // Gewinn-Errechnung Basis
+                            userWonAmount += b.amount;
                         }
                     }
 
@@ -847,7 +846,6 @@
                                 </div>
                             </div>
                             
-                            <!-- Bisherige Wetten anzeigen -->
                             <div class="bets-list-box">
                                 <strong style="color:var(--yellow);">📜 Platzierte Wetten:</strong>
                                 ${betsHTML || '<div style="color:#777; margin-top:5px;">Noch keine Wetten abgegeben.</div>'}
@@ -892,7 +890,6 @@
             });
         }
 
-        // Gewonnene Dias per Nachricht an den Admin anfordern
         function claimWinnings(fightTitle, winner) {
             if(!currentUser) return;
 
@@ -953,7 +950,6 @@
             }
         }
 
-        // ADMIN: Nachrichten & Gewinn-Anforderungen abrufen
         function listenForAdminMessages() {
             database.ref('admin_messages').on('value', (snapshot) => {
                 let tbody = document.getElementById('admin-messages-list');
@@ -1085,7 +1081,7 @@
         }
 
         function resetUserPassword(username) {
-            let newPass = prompt(`Bitte Neues Passwort für ${username} eingeben:`);
+            let newPass = prompt(`Neues Passwort für ${username} eingeben:`);
             if(newPass && newPass.trim() !== "") {
                 database.ref('users/' + username).update({ password: newPass.trim() }).then(() => {
                     alert(`Passwort für ${username} wurde erfolgreich geändert!`);
