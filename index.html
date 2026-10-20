@@ -120,6 +120,14 @@
             text-align: center;
             border: 1px solid var(--yellow);
         }
+        .bets-list-box {
+            background: #181818;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 13px;
+            border: 1px solid #333;
+        }
 
         /* Warenkorb, Historie & Admin */
         .cart-box, .history-box, .admin-box, .legal-box { 
@@ -326,7 +334,7 @@
         <!-- FIGHTS & BETS VIEW -->
         <div id="fights-view" class="view-section">
             <h2 class="category-title">⚔️ Anstehende Kämpfe & Wetten</h2>
-            <p style="margin-bottom: 20px; color: #ccc;">Platziere deine Wetten in Dias auf den Sieger! Die Auszahlung erfolgt nach dem Kampf durch die Admins.</p>
+            <p style="margin-bottom: 20px; color: #ccc;">Platziere deine Wetten in Dias auf den Sieger! Nach dem Kampf kannst du deinen Gewinn per Nachricht an den Admin anfordern.</p>
             
             <div id="fights-container">
                 <p>Lade Kämpfe...</p>
@@ -337,8 +345,25 @@
         <div id="admin-view" class="view-section">
             <h2 style="color: var(--yellow);">⚙️ Admin Dashboard</h2>
 
-            <!-- NEUEN KAMPF ERSTELLEN -->
+            <!-- NACHRICHTEN & GEWINN-AUSZAHLUNGEN -->
             <div class="admin-box" style="margin-top: 15px;">
+                <h3>📬 Gewinn-Auszahlungen & Nachrichten</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Spieler</th>
+                            <th>Nachricht / Gewinn-Anforderung</th>
+                            <th>Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-messages-list">
+                        <tr><td colspan="3">Lade Nachrichten...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- NEUEN KAMPF ERSTELLEN -->
+            <div class="admin-box">
                 <h3>⚔️ Neuen Kampf ansetzen</h3>
                 <div class="admin-form-group">
                     <input type="text" id="fight-p1" placeholder="Kämpfer 1 (Name)">
@@ -591,6 +616,7 @@
                 listenForUsers();
                 listenForCoupons();
                 listenForAdminFights();
+                listenForAdminMessages();
             }
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.getElementById(view + '-view').classList.add('active');
@@ -741,9 +767,8 @@
             });
         }
 
-        /* --- KÄMPFE & WETTEN LOGIK --- */
+        /* --- KÄMPFE, WETTEN & GEWINN-MELDUNG LOGIK --- */
 
-        // ADMIN: Kampf erstellen
         function createFight() {
             let p1 = document.getElementById('fight-p1').value.trim();
             let p2 = document.getElementById('fight-p2').value.trim();
@@ -770,7 +795,6 @@
             });
         }
 
-        // ÖFFENTLICH: Kämpfe und Wetten anzeigen
         function listenForPublicFights() {
             database.ref('fights').on('value', (snapshot) => {
                 let container = document.getElementById('fights-container');
@@ -788,19 +812,28 @@
                     let totalPool = 0;
                     let p1Bets = 0;
                     let p2Bets = 0;
+                    let betsHTML = "";
+                    let userWonAmount = 0;
 
                     for(let bKey in bets) {
                         let b = bets[bKey];
                         totalPool += b.amount;
                         if(b.fighter === f.player1) p1Bets += b.amount;
                         if(b.fighter === f.player2) p2Bets += b.amount;
+
+                        betsHTML += `<div>• <strong>${b.user}</strong>: ${b.amount} Dias auf <strong>${b.fighter}</strong></div>`;
+
+                        // Gewinn-Berechnung für den aktuellen Spieler
+                        if(f.status === 'Beendet' && f.winner && b.user === currentUser && b.fighter === f.winner) {
+                            userWonAmount += b.amount; // Gewinn-Errechnung Basis
+                        }
                     }
 
                     container.innerHTML += `
                         <div class="fight-card">
                             <div class="fight-header">
                                 <span style="color:var(--yellow); font-weight:bold;">🕒 ${f.time} Uhr</span>
-                                <span style="color:${f.status === 'Aktiv' ? '#28a745' : 'var(--red)'}; font-weight:bold;">${f.status === 'Aktiv' ? '● WETTEN OFFEN' : 'BEENDET (' + (f.winner ? 'Sieger: ' + f.winner : '') + ')'}</span>
+                                <span style="color:${f.status === 'Aktiv' ? '#28a745' : 'var(--red)'}; font-weight:bold;">${f.status === 'Aktiv' ? '● WETTEN OFFEN' : 'BEENDET (Sieger: ' + (f.winner || 'Keiner') + ')'}</span>
                             </div>
                             <div class="fight-vs">
                                 <div class="fighter-box">
@@ -813,11 +846,22 @@
                                     <small style="color:#aaa;">Wetten: ${p2Bets} Dias</small>
                                 </div>
                             </div>
-                            <div style="text-align:center; margin-top:10px;">
+                            
+                            <!-- Bisherige Wetten anzeigen -->
+                            <div class="bets-list-box">
+                                <strong style="color:var(--yellow);">📜 Platzierte Wetten:</strong>
+                                ${betsHTML || '<div style="color:#777; margin-top:5px;">Noch keine Wetten abgegeben.</div>'}
+                            </div>
+
+                            <div style="text-align:center; margin-top:15px;">
                                 <p style="font-size:14px; margin-bottom:10px;">💰 Gesamter Wett-Topf: <strong>${totalPool} Dias</strong></p>
                                 ${f.status === 'Aktiv' ? `
                                     <button onclick="placeBet('${key}', '${f.player1}')" style="background:var(--yellow); border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer; margin-right:10px;">Auf ${f.player1} wetten</button>
                                     <button onclick="placeBet('${key}', '${f.player2}')" style="background:var(--yellow); border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer;">Auf ${f.player2} wetten</button>
+                                ` : ''}
+
+                                ${f.status === 'Beendet' && userWonAmount > 0 ? `
+                                    <button onclick="claimWinnings('${f.player1} vs ${f.player2}', '${f.winner}')" style="background:#28a745; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; margin-top:10px;">🏆 Gewonnene Dias anfordern</button>
                                 ` : ''}
                             </div>
                         </div>
@@ -826,7 +870,6 @@
             });
         }
 
-        // Wette platzieren
         function placeBet(fightKey, fighterName) {
             if(!currentUser) {
                 alert("Du musst eingeloggt sein, um eine Wette abzugeben!");
@@ -849,7 +892,22 @@
             });
         }
 
-        // ADMIN: Kämpfe verwalten & Gewinner setzen
+        // Gewonnene Dias per Nachricht an den Admin anfordern
+        function claimWinnings(fightTitle, winner) {
+            if(!currentUser) return;
+
+            let msg = prompt(`Sende eine Nachricht an die Admins für deine Auszahlung (Kampf: ${fightTitle}):`, `Ich habe auf ${winner} gewettet und gewonnen! Bitte zahle mir meine Dias aus.`);
+            if(!msg) return;
+
+            database.ref('admin_messages').push().set({
+                user: currentUser,
+                message: msg,
+                time: new Date().toLocaleString('de-DE')
+            }).then(() => {
+                alert("Anforderung erfolgreich an das Admin-Dashboard gesendet!");
+            });
+        }
+
         function listenForAdminFights() {
             database.ref('fights').on('value', (snapshot) => {
                 let tbody = document.getElementById('admin-fights-list');
@@ -893,6 +951,35 @@
             if(confirm("Möchtest du diesen Kampf löschen?")) {
                 database.ref(`fights/${fightKey}`).remove();
             }
+        }
+
+        // ADMIN: Nachrichten & Gewinn-Anforderungen abrufen
+        function listenForAdminMessages() {
+            database.ref('admin_messages').on('value', (snapshot) => {
+                let tbody = document.getElementById('admin-messages-list');
+                tbody.innerHTML = "";
+                let msgs = snapshot.val();
+
+                if(!msgs) {
+                    tbody.innerHTML = "<tr><td colspan='3'>Keine neuen Nachrichten oder Auszahlungs-Anforderungen.</td></tr>";
+                    return;
+                }
+
+                for(let key in msgs) {
+                    let m = msgs[key];
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong>${m.user}</strong><br><small style="color:#888;">${m.time}</small></td>
+                            <td>${m.message}</td>
+                            <td><button class="status-btn" onclick="deleteMessage('${key}')">Erledigt / Ausgezahlt</button></td>
+                        </tr>
+                    `;
+                }
+            });
+        }
+
+        function deleteMessage(key) {
+            database.ref(`admin_messages/${key}`).remove();
         }
 
         function createDiscountCode() {
@@ -977,7 +1064,7 @@
                 let users = snapshot.val();
 
                 if(!users) {
-                    tbody.innerHTML = "<tr><td colspan='3'>Keine registrierten Accounts gefunden!.</td></tr>";
+                    tbody.innerHTML = "<tr><td colspan='3'>Keine registrierten Accounts gefunden.</td></tr>";
                     return;
                 }
 
@@ -998,7 +1085,7 @@
         }
 
         function resetUserPassword(username) {
-            let newPass = prompt(`Neues Passwort für ${username} eingeben:`);
+            let newPass = prompt(`Bitte Neues Passwort für ${username} eingeben:`);
             if(newPass && newPass.trim() !== "") {
                 database.ref('users/' + username).update({ password: newPass.trim() }).then(() => {
                     alert(`Passwort für ${username} wurde erfolgreich geändert!`);
