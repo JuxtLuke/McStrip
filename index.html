@@ -178,7 +178,7 @@
         <div class="logo"><span>Mc</span>Strip</div>
         <nav>
             <button onclick="switchView('shop')">Speisekarte & Services</button>
-            <button onclick="switchView('admin')">Admin Modus!</button>
+            <button onclick="switchView('admin')">Admin Modus</button>
         </nav>
     </header>
 
@@ -255,6 +255,7 @@
                     <select id="order-type" onchange="toggleCoords()">
                         <option value="Im Restaurant">Vor Ort im Restaurant essen / genießen</option>
                         <option value="Lieferservice">Lieferservice (Minecraft Coordinates)</option>
+                        <option value="Lieferung zum Casino">Lieferung zum Casino</option>
                     </select>
 
                     <input type="text" id="mc-coords" placeholder="MC Koordinaten (z.B. X: 120, Y: 64, Z: -450)" style="display:none;">
@@ -401,6 +402,22 @@
         let activeDiscountPercent = 0;
         let appliedCouponCode = "";
 
+        // Automatische Account-Prüfung beim Laden der Seite
+        function initApp() {
+            if(currentUser) {
+                database.ref('users/' + currentUser).once('value', (snapshot) => {
+                    if(!snapshot.exists()) {
+                        alert(`Der Account "${currentUser}" existiert nicht mehr und wurde ausgeloggt.`);
+                        currentUser = null;
+                        localStorage.removeItem('mc_username');
+                    }
+                    updateUI();
+                });
+            } else {
+                updateUI();
+            }
+        }
+
         function updateUI() {
             let userDisplay = document.getElementById('user-display');
             let authButtons = document.getElementById('auth-buttons');
@@ -495,7 +512,7 @@
         function switchView(view) {
             if(view === 'admin') {
                 let pass = prompt("Admin-Passwort eingeben:");
-                if(pass !== "67admin67") {
+                if(pass !== "67_admin_67") {
                     alert("Falsches Passwort!");
                     return;
                 }
@@ -547,7 +564,6 @@
             totalEl.innerText = finalTotal;
         }
 
-        // Rabattcode prüfen und einlösen
         function applyCoupon() {
             let codeInput = document.getElementById('coupon-code-input').value.trim().toUpperCase();
             let statusEl = document.getElementById('coupon-status');
@@ -562,224 +578,4 @@
                 if(coupon) {
                     activeDiscountPercent = parseInt(coupon.percent);
                     appliedCouponCode = codeInput;
-                    statusEl.innerHTML = `<span style='color: #28a745;'>Gutschein "${codeInput}" (${coupon.percent}% Rabatt) wurde erfolgreich aktiviert!</span>`;
-                    renderCart();
-                } else {
-                    statusEl.innerHTML = "<span style='color: var(--red);'>Ungültiger oder abgelaufener Rabattcode!</span>";
-                }
-            });
-        }
-
-        function toggleCoords() {
-            let type = document.getElementById('order-type').value;
-            document.getElementById('mc-coords').style.display = (type === 'Lieferservice') ? 'block' : 'none';
-        }
-
-        function checkout() {
-            if(!currentUser) {
-                alert("Du musst dich zuerst einloggen oder registrieren, um zu bestellen!");
-                openRegisterModal();
-                return;
-            }
-            if(cart.length === 0) {
-                alert("Dein Warenkorb ist leer!");
-                return;
-            }
-
-            let type = document.getElementById('order-type').value;
-            let coords = document.getElementById('mc-coords').value;
-
-            if(type === 'Lieferservice' && !coords) {
-                alert("Bitte gib deine Minecraft-Koordinaten ein!");
-                return;
-            }
-
-            let originalTotal = cart.reduce((a, b) => a + b.price, 0);
-            let finalTotal = originalTotal;
-            if(activeDiscountPercent > 0) {
-                finalTotal = Math.round(originalTotal * (1 - activeDiscountPercent / 100));
-            }
-
-            let newOrderRef = database.ref('orders').push();
-            newOrderRef.set({
-                user: currentUser,
-                type: type,
-                coords: type === 'Lieferservice' ? coords : 'Vor Ort',
-                items: cart.map(i => i.item).join(', '),
-                total: finalTotal,
-                couponUsed: appliedCouponCode || 'Keiner',
-                status: 'In Bearbeitung'
-            }).then(() => {
-                alert("Bestellung erfolgreich aufgegeben!");
-                cart = [];
-                activeDiscountPercent = 0;
-                appliedCouponCode = "";
-                document.getElementById('coupon-code-input').value = "";
-                document.getElementById('coupon-status').innerText = "";
-                renderCart();
-                loadUserHistory();
-            }).catch(error => {
-                alert("Fehler beim Senden: " + error.message);
-            });
-        }
-
-        function loadUserHistory() {
-            if(!currentUser) return;
-            database.ref('orders').on('value', (snapshot) => {
-                let tbody = document.getElementById('user-history-list');
-                tbody.innerHTML = "";
-                let orders = snapshot.val();
-                let hasOrders = false;
-
-                if(orders) {
-                    for(let key in orders) {
-                        let o = orders[key];
-                        if(o.user === currentUser) {
-                            hasOrders = true;
-                            tbody.innerHTML += `
-                                <tr>
-                                    <td>${o.items}</td>
-                                    <td>${o.type}</td>
-                                    <td>${o.total} Dias</td>
-                                    <td><span style="color: var(--yellow); font-weight: bold;">${o.status || 'Offen'}</span></td>
-                                </tr>
-                            `;
-                        }
-                    }
-                }
-                if(!hasOrders) {
-                    tbody.innerHTML = "<tr><td colspan='4'>Du hast noch keine Bestellungen aufgegeben.</td></tr>";
-                }
-            });
-        }
-
-        // ADMIN: Rabattcode Erstellen
-        function createDiscountCode() {
-            let codeName = document.getElementById('new-code-name').value.trim().toUpperCase();
-            let codePercent = parseInt(document.getElementById('new-code-percent').value);
-
-            if(!codeName || isNaN(codePercent) || codePercent < 1 || codePercent > 100) {
-                alert("Bitte gib einen gültigen Code-Namen und einen Prozentwert zwischen 1 und 100 ein!");
-                return;
-            }
-
-            database.ref('coupons/' + codeName).set({
-                percent: codePercent
-            }).then(() => {
-                alert(`Rabattcode "${codeName}" (${codePercent}%) erfolgreich erstellt!`);
-                document.getElementById('new-code-name').value = "";
-                document.getElementById('new-code-percent').value = "";
-            });
-        }
-
-        // ADMIN: Gutscheine auflisten
-        function listenForCoupons() {
-            database.ref('coupons').on('value', (snapshot) => {
-                let tbody = document.getElementById('admin-coupons-list');
-                tbody.innerHTML = "";
-                let coupons = snapshot.val();
-
-                if(!coupons) {
-                    tbody.innerHTML = "<tr><td colspan='3'>Keine aktiven Rabattcodes vorhanden.</td></tr>";
-                    return;
-                }
-
-                for(let code in coupons) {
-                    let c = coupons[code];
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong>${code}</strong></td>
-                            <td>${c.percent} %</td>
-                            <td><button class="delete-btn" onclick="deleteCoupon('${code}')">Löschen</button></td>
-                        </tr>
-                    `;
-                }
-            });
-        }
-
-        // ADMIN: Gutschein löschen
-        function deleteCoupon(code) {
-            if(confirm(`Möchtest du den Rabattcode "${code}" wirklich löschen?`)) {
-                database.ref('coupons/' + code).remove();
-            }
-        }
-
-        function listenForOrders() {
-            database.ref('orders').on('value', (snapshot) => {
-                let tbody = document.getElementById('admin-orders-list');
-                tbody.innerHTML = "";
-                let orders = snapshot.val();
-
-                if(!orders) {
-                    tbody.innerHTML = "<tr><td colspan='6'>Keine offenen Bestellungen.</td></tr>";
-                    return;
-                }
-
-                for(let key in orders) {
-                    let o = orders[key];
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong>${o.user}</strong></td>
-                            <td>${o.type}</td>
-                            <td>${o.coords}</td>
-                            <td>${o.items} ${o.couponUsed && o.couponUsed !== 'Keiner' ? `<br><small style="color:var(--yellow);">(Gutschein: ${o.couponUsed})</small>` : ''}</td>
-                            <td>${o.total} Dias</td>
-                            <td><button class="status-btn" onclick="completeOrder('${key}')">Erledigt</button></td>
-                        </tr>
-                    `;
-                }
-            });
-        }
-
-        function listenForUsers() {
-            database.ref('users').on('value', (snapshot) => {
-                let tbody = document.getElementById('admin-users-list');
-                tbody.innerHTML = "";
-                let users = snapshot.val();
-
-                if(!users) {
-                    tbody.innerHTML = "<tr><td colspan='3'>Keine registrierten Accounts gefunden.</td></tr>";
-                    return;
-                }
-
-                for(let username in users) {
-                    let userData = users[username];
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong>${username}</strong></td>
-                            <td><code>${userData.password}</code></td>
-                            <td>
-                                <button class="reset-btn" onclick="resetUserPassword('${username}')">Passwort ändern</button>
-                                <button class="delete-btn" onclick="deleteUserAccount('${username}')">Löschen</button>
-                            </td>
-                        </tr>
-                    `;
-                }
-            });
-        }
-
-        function resetUserPassword(username) {
-            let newPass = prompt(`Neues Passwort für ${username} eingeben:`);
-            if(newPass && newPass.trim() !== "") {
-                database.ref('users/' + username).update({ password: newPass.trim() }).then(() => {
-                    alert(`Passwort für ${username} wurde erfolgreich geändert!`);
-                });
-            }
-        }
-
-        function deleteUserAccount(username) {
-            if(confirm(`Möchtest du den Account von ${username} wirklich löschen?`)) {
-                database.ref('users/' + username).remove().then(() => {
-                    alert(`Account ${username} wurde gelöscht.`);
-                });
-            }
-        }
-
-        function completeOrder(key) {
-            database.ref('orders/' + key).remove();
-        }
-
-        updateUI();
-    </script>
-</body>
-</html>
+                    statusEl.innerHTML = `<span style='color: #2
