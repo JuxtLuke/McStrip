@@ -88,8 +88,8 @@
         }
         .card button:hover { background: #e0ac24; }
 
-        /* Warenkorb & Historie */
-        .cart-box, .history-box, .admin-box { 
+        /* Warenkorb, Historie & Modal / Legal */
+        .cart-box, .history-box, .admin-box, .legal-box { 
             background: var(--card-bg); 
             padding: 20px; 
             border-radius: 12px; 
@@ -116,6 +116,35 @@
         .status-btn:hover { background: #218838; }
         .reset-btn { background: #ffc107; color: black; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 5px; }
         .delete-btn { background: var(--red); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-card {
+            background: var(--card-bg);
+            border: 2px solid var(--yellow);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 450px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.8);
+        }
+        .modal-card h2 { color: var(--yellow); margin-bottom: 15px; }
+        .modal-card label { display: block; margin-top: 10px; font-size: 14px; }
+        .modal-card input[type="text"], .modal-card input[type="password"] { margin-top: 5px; }
+        .checkbox-container { display: flex; align-items: flex-start; gap: 10px; margin-top: 15px; font-size: 12px; color: #ccc; }
+        .checkbox-container input { width: auto; margin-top: 3px; cursor: pointer; }
+        .modal-actions { margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; }
+        .modal-actions button { padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; border: none; }
+        .btn-confirm { background: var(--yellow); color: black; }
+        .btn-cancel { background: #444; color: white; }
     </style>
 </head>
 <body>
@@ -131,7 +160,7 @@
     <div class="user-bar">
         <span id="user-display">Nicht eingeloggt</span>
         <div class="auth-btns" id="auth-buttons">
-            <button onclick="registerUser()">Registrieren</button>
+            <button onclick="openRegisterModal()">Registrieren</button>
             <button onclick="loginUser()">Einloggen</button>
         </div>
     </div>
@@ -142,6 +171,10 @@
         <div id="shop-view" class="view-section active">
             <h2 class="category-title">🍔 Fast Food Menu</h2>
             <div class="grid">
+                <div class="card">
+                    <div><h3>McLinus</h3><p>Der legendäre Chefbürger mit Spezialsoße.</p></div>
+                    <div><div class="price">20 Dias</div><button onclick="addToCart('McLinus', 20)">In den Warenkorb</button></div>
+                </div>
                 <div class="card">
                     <div><h3>McErotik Burger</h3><p>Extra saftig mit Spezialsoße.</p></div>
                     <div><div class="price">15 Dias</div><button onclick="addToCart('McErotik Burger', 15)">In den Warenkorb</button></div>
@@ -208,6 +241,13 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- AGB & DATENSCHUTZ HINWEIS -->
+            <div class="legal-box" style="margin-top: 30px; font-size: 13px; color: #aaa;">
+                <h3 style="color: var(--yellow); margin-bottom: 8px;">📜 AGB & Datenschutzbestimmungen</h3>
+                <p><strong>1. Haftungsausschluss für Datenlecks:</strong> Die Nutzung des Dienstes erfolgt auf eigene Gefahr. Für etwaige Datenlecks, technische Fehler oder unbefugte Zugriffe Dritter übernimmt McStrip keinerlei Haftung.</p>
+                <p style="margin-top: 5px;"><strong>2. Kontoverwaltung & Passwörter:</strong> Bitte verwende <strong>kein Passwort</strong>, das du auf anderen wichtigen Plattformen nutzt. Admins haben das Recht, Passwörter einzusehen, zu ändern oder Konten ohne Angabe von Gründen zu löschen.</p>
+            </div>
         </div>
 
         <!-- ADMIN VIEW -->
@@ -254,6 +294,31 @@
 
     </div>
 
+    <!-- REGISTRIERUNGS MODAL -->
+    <div class="modal-overlay" id="register-modal">
+        <div class="modal-card">
+            <h2>Account erstellen</h2>
+            
+            <label>Minecraft Name:</label>
+            <input type="text" id="reg-username" placeholder="z.B. Steve">
+
+            <label>Passwort:</label>
+            <input type="password" id="reg-password" placeholder="Passwort eingeben">
+
+            <div class="checkbox-container">
+                <input type="checkbox" id="reg-terms">
+                <label for="reg-terms">
+                    Ich akzeptiere die <strong>AGB & Datenschutzbestimmungen</strong>. Ich verstehe, dass McStrip nicht für Datenlecks haftet und Admins Passwörter einsehen sowie ändern können.
+                </label>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeRegisterModal()">Abbrechen</button>
+                <button class="btn-confirm" onclick="submitRegistration()">Registrieren</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const firebaseConfig = {
             apiKey: "AIzaSyBXd4QWbxZUcqcqBCpVNhZM1v7NZR_OC1A",
@@ -283,7 +348,7 @@
             } else {
                 userDisplay.innerText = "Nicht eingeloggt";
                 authButtons.innerHTML = `
-                    <button onclick="registerUser()">Registrieren</button>
+                    <button onclick="openRegisterModal()">Registrieren</button>
                     <button onclick="loginUser()">Einloggen</button>
                 `;
                 document.getElementById('user-history-list').innerHTML = `<tr><td colspan="4">Bitte logge dich ein, um deine Bestellungen zu sehen.</td></tr>`;
@@ -291,14 +356,33 @@
             renderCart();
         }
 
-        // Account Registrieren
-        function registerUser() {
-            let name = prompt("Wähle einen Minecraft-Namen:");
-            if(!name || name.trim() === "") return;
-            name = name.trim();
+        // Modal Steuerung
+        function openRegisterModal() {
+            document.getElementById('register-modal').style.display = 'flex';
+        }
 
-            let pass = prompt("Wähle ein Passwort:");
-            if(!pass || pass.trim() === "") return;
+        function closeRegisterModal() {
+            document.getElementById('register-modal').style.display = 'none';
+            document.getElementById('reg-username').value = '';
+            document.getElementById('reg-password').value = '';
+            document.getElementById('reg-terms').checked = false;
+        }
+
+        // Registrierung mit AGB Check
+        function submitRegistration() {
+            let name = document.getElementById('reg-username').value.trim();
+            let pass = document.getElementById('reg-password').value.trim();
+            let acceptedTerms = document.getElementById('reg-terms').checked;
+
+            if(!name || !pass) {
+                alert("Bitte gib einen Benutzernamen und ein Passwort ein!");
+                return;
+            }
+
+            if(!acceptedTerms) {
+                alert("Du musst die AGB & Datenschutzbestimmungen akzeptieren, um ein Konto zu erstellen!");
+                return;
+            }
 
             database.ref('users/' + name).once('value', (snapshot) => {
                 if(snapshot.exists()) {
@@ -308,13 +392,13 @@
                         alert("Account erfolgreich erstellt! Du bist jetzt eingeloggt.");
                         currentUser = name;
                         localStorage.setItem('mc_username', currentUser);
+                        closeRegisterModal();
                         updateUI();
                     });
                 }
             });
         }
 
-        // Account Einloggen
         function loginUser() {
             let name = prompt("Dein Minecraft-Name:");
             if(!name || name.trim() === "") return;
@@ -336,7 +420,6 @@
             });
         }
 
-        // Ausloggen
         function logoutUser() {
             currentUser = null;
             localStorage.removeItem('mc_username');
@@ -348,7 +431,7 @@
         function switchView(view) {
             if(view === 'admin') {
                 let pass = prompt("Admin-Passwort eingeben:");
-                if(pass !== "67admin67") { // Neue Passwortabfrage
+                if(pass !== "67admin67") {
                     alert("Falsches Passwort!");
                     return;
                 }
@@ -362,7 +445,7 @@
         function addToCart(item, price) {
             if(!currentUser) {
                 alert("Du musst dich zuerst einloggen oder registrieren, um bestellen zu können!");
-                loginUser();
+                openRegisterModal();
                 return;
             }
             cart.push({item, price});
@@ -394,7 +477,7 @@
         function checkout() {
             if(!currentUser) {
                 alert("Du musst dich zuerst einloggen oder registrieren, um zu bestellen!");
-                loginUser();
+                openRegisterModal();
                 return;
             }
             if(cart.length === 0) {
