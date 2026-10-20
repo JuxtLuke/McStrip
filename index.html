@@ -977,7 +977,7 @@
                 let users = snapshot.val();
 
                 if(!users) {
-                    tbody.innerHTML = "<tr><td colspan='3'>Keine registrierten Accounts gefunden.</td></tr>";
+                    tbody.innerHTML = "<tr><td colspan='3'>Keine registrierten Accounts gefunden!.</td></tr>";
                     return;
                 }
 
@@ -1007,7 +1007,7 @@
         }
 
         function deleteUserAccount(username) {
-            if(confirm(`Möchtest du den Account von ${username} wirklich löschen??`)) {
+            if(confirm(`Möchtest du den Account von ${username} wirklich löschen?`)) {
                 database.ref('users/' + username).remove().then(() => {
                     alert(`Account ${username} wurde gelöscht.`);
                 });
